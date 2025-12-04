@@ -105,15 +105,25 @@ const queueMsg = document.getElementById('queueMsg');
 tabQueue.onclick = ()=> setTab('queue');
 tabAdmin.onclick = ()=> setTab('admin');
 
-function setTab(name){
-  if(name==='queue'){
-    tabQueue.classList.add('active'); tabAdmin.classList.remove('active');
-    queueSection.style.display = ''; adminSection.style.display = 'none';
+function setTab(name) {
+  if (name === 'admin' && tabAdmin.classList.contains('hidden')) {
+    // If user is staff and admin tab is hidden, ignore clicks
+    return;
+  }
+
+  if (name === 'queue') {
+    tabQueue.classList.add('active');
+    tabAdmin.classList.remove('active');
+    queueSection.style.display = '';
+    adminSection.style.display = 'none';
   } else {
-    tabQueue.classList.remove('active'); tabAdmin.classList.add('active');
-    queueSection.style.display = 'none'; adminSection.style.display = '';
+    tabQueue.classList.remove('active');
+    tabAdmin.classList.add('active');
+    queueSection.style.display = 'none';
+    adminSection.style.display = '';
   }
 }
+
 
 // load departments (static JSON)
 let departments = [];
@@ -394,19 +404,27 @@ async function toggleActive(id, newState){
 }
 
 // ----------------- Init -----------------
-async function init(){
-  const user = await loadMe();
+async function init() {
+  const user = await loadMe();   // get session user
   await loadDepts();
+
   document.getElementById('date').value = new Date().toISOString().slice(0,10);
   await loadTokens();
-  if(user && user.role === 'admin'){
-    tabAdmin.classList.remove('hidden');
-    // Load users for admin tab
-    await loadUsers();
-  } else {
+
+  // If NOT admin → hide Admin tab + hide Admin section permanently
+  if (!user || user.role !== 'admin') {
     tabAdmin.classList.add('hidden');
+    adminSection.classList.add('hidden');
+    // Ensure queue tab is active
+    setTab('queue');
+  } else {
+    // User IS admin → show admin features
+    tabAdmin.classList.remove('hidden');
+    adminSection.classList.remove('hidden');
+    await loadUsers();   // Load user list for admin
   }
 }
+
 init();
 
 </script>
