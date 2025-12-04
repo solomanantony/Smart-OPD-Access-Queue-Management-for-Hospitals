@@ -1,0 +1,120 @@
+<!-- templates/index.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Hospital Token - Patient</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Get Your Token</h1>
+    <form id="tokenForm">
+      <label>Name</label><br>
+      <input id="name" required><br>
+      <label>Phone</label><br>
+      <input id="phone"><br>
+      <label>Department</label><br>
+      <select id="dept"></select><br>
+      <label>Date</label><br>
+      <input type="date" id="date" value=""><br>
+      <label>Reason</label><br>
+      <input id="reason"><br>
+      <label><input type="checkbox" id="priority"> Request Priority (e.g., elderly/emergency)</label><br>
+      <button type="submit">Get Token</button>
+    </form>
+
+    <div id="card" style="display:none;">
+      <h2>Your Token: <span id="tokenNo"></span></h2>
+      <p>Position ahead: <span id="position"></span></p>
+      <p>Estimated wait: <span id="eta"></span> minutes</p>
+      <p>Status: <span id="status"></span></p>
+      <button id="cancelBtn">Cancel Token</button>
+    </div>
+  </div>
+
+<script>
+const apiBase = "/api";
+async function loadDepts(){
+  const res = await fetch(apiBase + "/admin/tokens?date=2025-01-01"); // hack: we'll fetch depts separately
+  // Instead call a small endpoint for departments? We'll get departments via /static JSON fallback
+}
+// Quick dept fetch
+async function fetchDepartments(){
+  const res = await fetch("/static/js/departments.json");
+  const depts = await res.json();
+  const sel = document.getElementById('dept');
+  depts.forEach(d=>{
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = d.name;
+    sel.appendChild(opt);
+  });
+}
+fetchDepartments();
+
+let currentToken = null;
+document.getElementById('tokenForm').onsubmit = async (e)=>{
+  e.preventDefault();
+  const payload = {
+    patient_name: document.getElementById('name').value,
+    patient_phone: document.getElementById('phone').value,
+    dept_id: document.getElementById('dept').value,
+    appointment_date: document.getElementById('date').value || new Date().toISOString().slice(0,10),
+    reason: document.getElementById('reason').value,
+    priority_requested: document.getElementById('priority').checked
+  };
+  const res = await fetch(apiBase + "/token", {
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if(data.status === "success"){
+    currentToken = data.token_no;
+    showCard(data.token_no, data.position_ahead, data.estimated_wait_minutes, "Waiting");
+    startPolling();
+  } else {
+    alert("Error: " + (data.message || "unknown"));
+  }
+};
+
+function showCard(tokenNo, pos, eta, status){
+  document.getElementById('card').style.display = 'block';
+  document.getElementById('tokenNo').textContent = tokenNo;
+  document.getElementById('position').textContent = pos;
+  document.getElementById('eta').textContent = Math.max(0, eta||0);
+  document.getElementById('status').textContent = status;
+}
+
+let pollInterval = null;
+function startPolling(){
+  if(pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(async ()=>{
+    if(!currentToken) return;
+    const res = await fetch(apiBase + "/token/" + currentToken);
+    if(!res.ok) return;
+    const data = await res.json();
+    if(data.status === "success"){
+      const t = data.token;
+      showCard(t.token_no, data.position_ahead, data.estimated_wait_minutes, t.status);
+      if(["Completed","Cancelled","No-show"].includes(t.status)) clearInterval(pollInterval);
+    }
+  }, 5000);
+}
+
+document.getElementById('cancelBtn').onclick = async ()=>{
+  if(!currentToken) return alert("No token");
+  const res = await fetch(apiBase + "/token/" + currentToken + "/cancel", {method:"PUT"});
+  const data = await res.json();
+  if(data.status === "success"){
+    alert("Cancelled");
+    document.getElementById('status').textContent = "Cancelled";
+    clearInterval(pollInterval);
+  } else {
+    alert("Error cancelling: " + (data.message || ""));
+  }
+};
+</script>
+</body>
+</html>

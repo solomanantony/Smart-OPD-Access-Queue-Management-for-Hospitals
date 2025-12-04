@@ -1,0 +1,32 @@
+<!-- templates/staff_login.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Staff Login</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Staff Login (Demo)</h1>
+    <input id="email" placeholder="staff email (e.g., alice@hospital.test)"><br>
+    <button id="loginBtn">Login</button>
+  </div>
+<script>
+document.getElementById('loginBtn').onclick = async ()=>{
+  const email = document.getElementById('email').value;
+  const res = await fetch("/api/staff/login", {
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({email})
+  });
+  const data = await res.json();
+  if(data.status === "success"){
+    window.location.href = "/staff/dashboard";
+  } else {
+    alert("Login failed: " + (data.message || ""));
+  }
+};
+</script>
+</body>
+</html>
